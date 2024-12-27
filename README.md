@@ -1,44 +1,44 @@
-# WebShell
+# Python WebShell
 
-A web-based interface for interacting with running Python applications. This tool provides a comfortable REPL environment that allows you to inject and execute code in a running Python application's runtime.
+A web-based Python REPL with object inspection capabilities.
 
 ## Features
 
-- Real-time code execution in the target Python application
 - Multi-line code support
+- Object inspection with detailed metadata
+- Method and attribute exploration
 - Syntax highlighting
-- Clean, modern interface
-- Non-blocking communication with the Python application
+- Real-time output
+- Connection status indicators
+- Navigation history for inspected objects
+- Runnable method detection
 
-## Setup
+## Installation
 
-1. Install dependencies:
+1. Install Node.js dependencies:
 ```bash
 npm install
 ```
 
-2. Start the web server:
+2. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+1. Start the server:
 ```bash
 npm start
 ```
 
-3. Connect to http://localhost:3000 in your browser
-
-## Usage
-
-- Type Python code in the input area
-- Press Shift+Enter to execute code immediately
-- For multi-line code blocks:
-  1. Type each line of code
-  2. Leave an empty line to execute the entire block
-
-## Architecture
-
-- Frontend: HTML5, CSS3, JavaScript with Socket.IO client
-- Backend: Node.js with Express and Socket.IO
-- Communication: TCP sockets for Python interaction
+2. Open your browser and navigate to `http://localhost:3000`
 
 ## Port Configuration
 
 - Web Server: Port 3000
-- Python Connection: Port 9999 (configurable in server.js)
+- Python Connection: Port 1337 (configurable in server.js)
+
+## License
+
+MIT
