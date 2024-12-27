@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python WebShell</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="status-bar">
+            <span id="status-indicator" class="status-indicator"></span>
+            <span id="status-text">Disconnected</span>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab-button active" data-tab="repl">REPL</button>
+            <button class="tab-button" data-tab="canvas">Object Inspector</button>
+        </div>
+
+        <div class="tab-content active" id="repl-tab">
+            <div class="output-container">
+                <pre id="output" class="output"></pre>
+            </div>
+            <div class="input-container">
+                <textarea id="input" class="input" placeholder="Enter Python code here. Press Shift+Enter to execute, or leave an empty line to execute a block." rows="4"></textarea>
+            </div>
+        </div>
+
+        <div class="tab-content" id="canvas-tab">
+            <div class="canvas-container">
+                <div class="inspector-header">
+                    <button id="inspect-back" class="nav-button" disabled>←</button>
+                    <button id="inspect-forward" class="nav-button" disabled>→</button>
+                    <input type="text" id="inspect-input" placeholder="Enter expression to inspect (e.g., 'sys.modules')" />
+                    <button id="inspect-button">Inspect</button>
+                </div>
+                <div class="inspector-tree">
+                    <div id="tree-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>

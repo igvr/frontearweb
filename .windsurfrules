@@ -1,0 +1,2 @@
+python code must be non-blocking, async whem possible.
+python version is 3.12
