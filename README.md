@@ -15,14 +15,9 @@ A web-based Python REPL with object inspection capabilities.
 
 ## Installation
 
-1. Install Node.js dependencies:
+Install Node.js dependencies:
 ```bash
 npm install
-```
-
-2. Install Python dependencies:
-```bash
-pip install -r requirements.txt
 ```
 
 ## Usage
