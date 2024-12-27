@@ -11,12 +11,11 @@
     <div class="container">
         <div class="status-bar">
             <span id="status-indicator" class="status-indicator"></span>
-            <span id="status-text">Disconnected</span>
         </div>
         
         <div class="tabs">
             <button class="tab-button active" data-tab="repl">REPL</button>
-            <button class="tab-button" data-tab="canvas">Object Inspector</button>
+            <button class="tab-button" data-tab="inspector">Object Inspector</button>
         </div>
 
         <div class="tab-content active" id="repl-tab">
@@ -28,13 +27,14 @@
             </div>
         </div>
 
-        <div class="tab-content" id="canvas-tab">
-            <div class="canvas-container">
+        <div class="tab-content" id="inspector-tab">
+            <div class="inspector-container">
                 <div class="inspector-header">
                     <button id="inspect-back" class="nav-button" disabled>←</button>
                     <button id="inspect-forward" class="nav-button" disabled>→</button>
                     <input type="text" id="inspect-input" placeholder="Enter expression to inspect (e.g., 'sys.modules')" />
                     <button id="inspect-button">Inspect</button>
+                    <button id="modules-shortcut" class="shortcut-button"><span class="emoji">📦</span>sys.modules</button>
                 </div>
                 <div class="inspector-tree">
                     <div id="tree-container"></div>

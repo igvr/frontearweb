@@ -27,19 +27,62 @@ body {
     border-radius: 4px;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
 }
 
 .status-indicator {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: #ff4444;
-    transition: background-color 0.3s ease;
+    font-size: 14px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-.status-indicator.connected {
-    background-color: #00c853;
+/* Browser to Node connection */
+.status-indicator::before {
+    content: "🌐";
+    opacity: 0.5;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* Node to Python connection */
+.status-indicator::after {
+    content: "🐍";
+    opacity: 0.5;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* Connected states */
+.status-indicator.socket-connected::before {
+    content: "🌐";
+    opacity: 1;
+    animation: none;
+}
+
+.status-indicator.python-connected::after {
+    content: "🐍";
+    opacity: 1;
+    animation: none;
+}
+
+/* Error states */
+.status-indicator.socket-error::before {
+    content: "⚡";
+    animation: flash 0.5s ease-in-out infinite;
+}
+
+.status-indicator.python-error::after {
+    content: "💥";
+    animation: flash 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.95); }
+}
+
+@keyframes flash {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
 }
 
 .tabs {
@@ -97,18 +140,57 @@ body {
 
 .output-container {
     flex-grow: 1;
-    background-color: #2d2d2d;
+    background-color: #1a1b26;
     border-radius: 4px;
     margin-bottom: 1rem;
     overflow-y: auto;
+    font-family: 'Monaco', monospace;
+    padding: 0.5rem;
+    border: 1px solid #565f89;
 }
 
 .output {
-    padding: 1rem;
+    padding: 0;
     white-space: pre-wrap;
     word-wrap: break-word;
     font-size: 14px;
     line-height: 1.5;
+    color: #c0caf5;
+}
+
+.output-line {
+    padding: 2px 0;
+    display: flex;
+    gap: 8px;
+}
+
+.output-line.command {
+    color: #7aa2f7;
+    margin-top: 8px;
+}
+
+.output-line.command::before {
+    content: "❯";
+    color: #9ece6a;
+    font-weight: bold;
+}
+
+.output-line.error {
+    color: #f7768e;
+}
+
+.output-line.error::before {
+    content: "✖";
+    color: #f7768e;
+}
+
+.output-line.success {
+    color: #9ece6a;
+}
+
+.output-line.success::before {
+    content: "✓";
+    color: #9ece6a;
 }
 
 .input-container {
@@ -146,9 +228,46 @@ body {
     display: flex;
     gap: 8px;
     padding: 8px;
-    background: var(--header-bg);
-    border-bottom: 1px solid var(--border-color);
-    align-items: center;
+    background: #24283b;
+    border: 1px solid #565f89;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+.inspector-header:focus-within {
+    background: #2f334d;
+    border-color: #7aa2f7;
+}
+
+#inspect-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #c0caf5;
+    font-family: 'Monaco', monospace;
+    font-size: 13px;
+    outline: none;
+}
+
+#inspect-button {
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #7aa2f7;
+    color: #1a1b26;
+    border: none;
+}
+
+#inspect-button:hover {
+    background: #bb9af7;
+    transform: translateY(-1px);
+}
+
+#inspect-button:active {
+    transform: translateY(0);
 }
 
 .inspector-tree {
@@ -249,6 +368,9 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
 }
 
 .tree-node-name {
@@ -260,7 +382,7 @@ body {
 .tree-node-type {
     padding: 2px 6px;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 11px;
     background: #1a1b26;
     border: 1px solid;
 }
@@ -326,27 +448,6 @@ body {
     border-left: 1px dashed #565f89;
 }
 
-.tree-node-toggle {
-    padding: 4px 8px;
-    border-radius: 3px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #1a1b26;
-    border: 1px solid #565f89;
-    color: #c0caf5;
-}
-
-.tree-node-toggle:hover {
-    background: #2f334d;
-    border-color: #7aa2f7;
-}
-
 .tree-node-inspect {
     padding: 4px 8px;
     border-radius: 3px;
@@ -368,13 +469,13 @@ body {
 }
 
 .nav-button {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     background: #1a1b26;
     border: 1px solid #565f89;
     border-radius: 4px;
     color: #c0caf5;
-    font-size: 16px;
+    font-size: 14px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
@@ -502,6 +603,32 @@ body {
     border: 1px solid #565f89;
 }
 
+/* Runnable method indicator */
+.method-badge.runnable .run-button {
+    cursor: pointer;
+    display: inline-block;
+    margin-left: 4px;
+    content: "⚡";
+    font-size: 10px;
+    transition: all 0.2s ease;
+}
+
+.method-badge.runnable .run-button:hover {
+    text-shadow: 0 0 8px rgba(255, 158, 100, 0.8);
+    transform: scale(1.2);
+}
+
+.method-badge.not-runnable {
+    opacity: 0.7;
+}
+
+.method-badge.not-runnable::after {
+    content: "⊘";
+    margin-left: 4px;
+    font-size: 10px;
+    opacity: 0.7;
+}
+
 /* Decorator badges */
 .decorator-badge {
     font-size: 11px;
@@ -575,4 +702,54 @@ body {
     justify-content: center;
     height: 100%;
     color: #666;
+}
+
+/* Runnable method indicator */
+.method-badge.runnable .run-button {
+    cursor: pointer;
+    display: inline-block;
+    margin-left: 4px;
+    content: "⚡";
+    font-size: 10px;
+    transition: all 0.2s ease;
+}
+
+.method-badge.runnable .run-button:hover {
+    text-shadow: 0 0 8px rgba(255, 158, 100, 0.8);
+    transform: scale(1.2);
+}
+
+.method-badge.not-runnable::after {
+    content: "⊘";
+    margin-left: 4px;
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+.shortcut-button {
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #1a1b26;
+    color: #7aa2f7;
+    border: 1px solid #565f89;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.shortcut-button:hover {
+    background: #2f334d;
+    border-color: #7aa2f7;
+    transform: translateY(-1px);
+}
+
+.shortcut-button:active {
+    transform: translateY(0);
+}
+
+.shortcut-button .emoji {
+    font-size: 14px;
 }

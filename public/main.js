@@ -2,7 +2,6 @@ const socket = io();
 const output = document.getElementById('output');
 const input = document.getElementById('input');
 const statusIndicator = document.getElementById('status-indicator');
-const statusText = document.getElementById('status-text');
 const inspectInput = document.getElementById('inspect-input');
 const inspectButton = document.getElementById('inspect-button');
 const inspectBack = document.getElementById('inspect-back');
@@ -80,27 +79,92 @@ inspectButton.addEventListener('click', inspectExpression);
 
 socket.on('connect', () => {
     console.log('Connected to server');
+    statusIndicator.classList.add('socket-connected');
+    statusIndicator.classList.remove('socket-error');
 });
 
 socket.on('disconnect', () => {
     console.log('Disconnected from server');
-    updateStatus(false);
+    statusIndicator.classList.remove('socket-connected');
+    statusIndicator.classList.add('socket-error');
+    updateInputStates(false);
 });
 
 socket.on('pythonStatus', (connected) => {
-    updateStatus(connected);
+    statusIndicator.classList.toggle('python-connected', connected);
+    statusIndicator.classList.toggle('python-error', !connected);
+    updateInputStates(connected);
+});
+
+function updateInputStates(enabled) {
+    input.disabled = !enabled;
+    inspectInput.disabled = !enabled;
+    input.placeholder = enabled 
+        ? "Enter Python code here. Press Shift+Enter to execute, or leave an empty line to execute a block."
+        : "Waiting for Python connection...";
+}
+
+function addOutputLine(text, type = 'output') {
+    const line = document.createElement('div');
+    line.className = `output-line ${type}`;
+    line.textContent = text;
+    output.appendChild(line);
+    output.scrollTop = output.scrollHeight;
+}
+
+input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        if (e.shiftKey) {
+            e.preventDefault();
+            const code = input.value.trim();
+            if (code) {
+                addOutputLine(code, 'command');
+                socket.emit('execute', {
+                    type: 'repl',
+                    code: code
+                });
+                input.value = '';
+                codeBuffer = [];
+            }
+        } else if (input.value.trim() === '') {
+            e.preventDefault();
+            if (codeBuffer.length > 0) {
+                const code = codeBuffer.join('\n');
+                addOutputLine(code, 'command');
+                socket.emit('execute', {
+                    type: 'repl',
+                    code: code
+                });
+                input.value = '';
+                codeBuffer = [];
+            }
+        }
+    }
 });
 
 socket.on('output', (data) => {
-    output.textContent += data;
-    output.scrollTop = output.scrollHeight;
+    addOutputLine(data);
+});
+
+socket.on('error', (data) => {
+    addOutputLine(data, 'error');
+});
+
+socket.on('success', (data) => {
+    addOutputLine(data.message, 'success');
 });
 
 socket.on('inspect_result', (result) => {
     console.log('Received inspect result:', result);
     if (result.data) {
         const container = document.getElementById('tree-container');
-        createTree(result.data, container, inspectInput.value.trim());
+        if (!container) {
+            console.error('Tree container not found');
+            return;
+        }
+        const path = inspectInput.value.trim();
+        console.log('Creating tree for path:', path);
+        createTree(result.data, container, path);
     } else {
         console.error('Invalid inspect result:', result);
     }
@@ -109,10 +173,19 @@ socket.on('inspect_result', (result) => {
 // Tab handling
 document.querySelectorAll('.tab-button').forEach(button => {
     button.addEventListener('click', () => {
+        // Remove active class from all tabs
         document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        // Add active class to clicked tab
         button.classList.add('active');
-        document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
+        const tabId = button.dataset.tab;
+        const tabContent = document.getElementById(`${tabId}-tab`);
+        if (tabContent) {
+            tabContent.classList.add('active');
+        } else {
+            console.error(`Tab content not found: ${tabId}-tab`);
+        }
     });
 });
 
@@ -187,10 +260,12 @@ function createMethodDetails(info) {
     }
 
     // Add signature
-    const signatureDiv = document.createElement('div');
-    signatureDiv.className = 'method-signature';
-    signatureDiv.textContent = info.signature;
-    details.appendChild(signatureDiv);
+    if (info.signature) {
+        const signatureDiv = document.createElement('div');
+        signatureDiv.className = 'method-signature';
+        signatureDiv.textContent = info.signature;
+        details.appendChild(signatureDiv);
+    }
 
     // Add metadata
     const metadataDiv = document.createElement('div');
@@ -224,10 +299,12 @@ function createMethodDetails(info) {
         metadataDiv.appendChild(propertyBadge);
     }
 
-    details.appendChild(metadataDiv);
+    if (metadataDiv.children.length > 0) {
+        details.appendChild(metadataDiv);
+    }
 
     // Add documentation
-    if (info.doc) {
+    if (info.doc && info.doc !== "No documentation available") {
         const docDiv = document.createElement('div');
         docDiv.className = 'method-doc';
         docDiv.textContent = info.doc;
@@ -245,6 +322,14 @@ function createMethodDetails(info) {
     return details;
 }
 
+function shouldUseBracketNotation(path, name) {
+    // Use bracket notation for:
+    // 1. Direct sys.modules access
+    // 2. Direct globals() access
+    // 3. When the key contains characters that make it invalid as a JS identifier
+    return (path === 'sys.modules' || path === 'globals()') || !(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name));
+}
+
 function createTreeNode(name, info, path = '', parentIsDict = false) {
     const node = document.createElement('div');
     node.className = 'tree-node';
@@ -252,15 +337,6 @@ function createTreeNode(name, info, path = '', parentIsDict = false) {
 
     const header = document.createElement('div');
     header.className = 'tree-node-header';
-
-    const toggle = document.createElement('span');
-    toggle.className = 'tree-node-toggle';
-    toggle.textContent = '+';
-    toggle.onclick = (e) => {
-        e.stopPropagation();
-        node.classList.toggle('expanded');
-        toggle.textContent = node.classList.contains('expanded') ? '-' : '+';
-    };
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'tree-node-name';
@@ -273,8 +349,62 @@ function createTreeNode(name, info, path = '', parentIsDict = false) {
     // Add method type badge if it's a method
     if (info.type === 'method' && info.method_type) {
         const methodBadge = document.createElement('span');
-        methodBadge.className = `method-badge ${info.method_type}`;
+        methodBadge.className = `method-badge ${info.method_type} ${info.is_runnable ? 'runnable' : 'not-runnable'}`;
         methodBadge.textContent = info.method_type;
+        
+        if (info.is_runnable) {
+            const runButton = document.createElement('span');
+            runButton.className = 'run-button';
+            runButton.textContent = '⚡';
+            runButton.onclick = (e) => {
+                e.stopPropagation();
+                
+                let fullPath;
+                if (parentIsDict && shouldUseBracketNotation(path, name)) {
+                    fullPath = `${path}['${name}']`;
+                } else {
+                    fullPath = path ? `${path}.${name}` : name;
+                }
+                
+                // Generate call string with parameter names if available
+                let callStr = fullPath;
+                if (info.signature && info.signature !== "Signature unavailable") {
+                    try {
+                        // Extract parameters from signature string
+                        const match = info.signature.match(/\((.*?)\)/);
+                        if (match) {
+                            const params = match[1].split(',')
+                                .map(p => p.trim())
+                                .filter(p => p && !p.startsWith('*'))  // Filter out empty and *args/**kwargs
+                                .map(p => {
+                                    const [name] = p.split(':');  // Handle type hints
+                                    const [paramName] = name.split('=');  // Handle default values
+                                    return paramName.trim();
+                                })
+                                .join(', ');
+                            callStr += `(${params})`;
+                        } else {
+                            callStr += '()';
+                        }
+                    } catch (e) {
+                        console.error('Error parsing signature:', e);
+                        callStr += '()';
+                    }
+                } else {
+                    callStr += '()';
+                }
+                
+                console.log('Generated call string:', callStr);
+                
+                // Switch to REPL tab and set input
+                document.querySelector('[data-tab="repl"]').click();
+                const input = document.getElementById('input');
+                input.value = callStr;
+                input.focus();
+            };
+            methodBadge.appendChild(runButton);
+        }
+        
         header.appendChild(methodBadge);
     }
 
@@ -284,7 +414,7 @@ function createTreeNode(name, info, path = '', parentIsDict = false) {
     inspectButton.onclick = (e) => {
         e.stopPropagation();
         let fullPath;
-        if (parentIsDict) {
+        if (parentIsDict && shouldUseBracketNotation(path, name)) {
             fullPath = `${path}['${name}']`;
         } else {
             fullPath = path ? `${path}.${name}` : name;
@@ -293,7 +423,6 @@ function createTreeNode(name, info, path = '', parentIsDict = false) {
         navigateToPath(fullPath);
     };
 
-    header.appendChild(toggle);
     header.appendChild(nameSpan);
     header.appendChild(typeSpan);
     header.appendChild(inspectButton);
@@ -303,46 +432,44 @@ function createTreeNode(name, info, path = '', parentIsDict = false) {
     
     if (info.type === 'method') {
         detailsDiv.appendChild(createMethodDetails(info));
-    } else if (info.category === 'sequence') {
-        detailsDiv.innerHTML = `${info.value}\n<div class="sequence-info">Length: ${info.metadata.length}, Element Types: ${info.metadata.element_types.join(', ')}</div>`;
-    } else if (info.category === 'dictionary') {
-        detailsDiv.innerHTML = `${info.value}\n<div class="dictionary-info">Length: ${info.metadata.length}, Key Types: ${info.metadata.key_types.join(', ')}, Value Types: ${info.metadata.value_types.join(', ')}</div>`;
+    } else if (info.category === 'sequence' && info.metadata) {
+        detailsDiv.innerHTML = `${info.value}\n<div class="sequence-info">Length: ${info.metadata.length || 'unknown'}, Element Types: ${info.metadata.element_types?.join(', ') || 'unknown'}</div>`;
+    } else if (info.category === 'dictionary' && info.metadata) {
+        detailsDiv.innerHTML = `${info.value}\n<div class="dictionary-info">Length: ${info.metadata.length || 'unknown'}, Key Types: ${info.metadata.key_types?.join(', ') || 'unknown'}, Value Types: ${info.metadata.value_types?.join(', ') || 'unknown'}</div>`;
     } else if (info.type === 'error') {
         detailsDiv.innerHTML = `<div class="error-details">${info.error_type}: ${info.error}</div>`;
     } else {
         detailsDiv.textContent = info.value || '';
     }
 
-    const childrenDiv = document.createElement('div');
-    childrenDiv.className = 'tree-node-children';
-
     node.appendChild(header);
     node.appendChild(detailsDiv);
-    node.appendChild(childrenDiv);
 
     return node;
 }
 
 function createTree(data, container, parentPath = '') {
+    console.log('Creating tree with data:', data);
     container.innerHTML = '';
     
     // Add metadata header
     container.appendChild(createMetadataHeader(data));
     
     const isDict = data.category === 'dictionary' || parentPath.includes('sys.modules');
+    console.log('Is dictionary:', isDict, 'Parent path:', parentPath);
     
     // Create tree structure
     const rootNode = document.createElement('div');
     rootNode.className = 'tree-root';
     
     // Add methods
-    if (Object.keys(data.methods).length > 0) {
+    if (data.methods && Object.keys(data.methods).length > 0) {
+        console.log('Adding methods:', Object.keys(data.methods));
         const methodsSection = document.createElement('div');
         methodsSection.className = 'tree-section';
         
         Object.entries(data.methods).forEach(([name, info]) => {
-            const path = parentPath ? `${parentPath}.${name}` : name;
-            const node = createTreeNode(name, info, parentPath, false);
+            const node = createTreeNode(name, info, parentPath, isDict);
             methodsSection.appendChild(node);
         });
         
@@ -350,15 +477,35 @@ function createTree(data, container, parentPath = '') {
     }
 
     // Add attributes
-    if (Object.keys(data.attributes).length > 0) {
+    if (data.attributes && Object.keys(data.attributes).length > 0) {
+        console.log('Adding attributes:', Object.keys(data.attributes));
         const attributesSection = document.createElement('div');
         attributesSection.className = 'tree-section';
         
-        Object.entries(data.attributes).forEach(([name, info]) => {
-            const path = parentPath;
-            const node = createTreeNode(name, info, path, isDict);
-            attributesSection.appendChild(node);
-        });
+        if (parentPath === 'sys.modules') {
+            // Group modules by their top-level package
+            const moduleGroups = {};
+            
+            Object.entries(data.attributes).forEach(([name, info]) => {
+                const topLevel = name.split('.')[0];
+                if (!moduleGroups[topLevel]) {
+                    moduleGroups[topLevel] = [];
+                }
+                moduleGroups[topLevel].push([name, info]);
+            });
+            
+            Object.entries(moduleGroups).sort().forEach(([topLevel, modules]) => {
+                // Only show the top-level module
+                const [name, info] = modules.find(([n]) => n === topLevel) || modules[0];
+                const node = createTreeNode(name, info, parentPath, isDict);
+                attributesSection.appendChild(node);
+            });
+        } else {
+            Object.entries(data.attributes).forEach(([name, info]) => {
+                const node = createTreeNode(name, info, parentPath, isDict);
+                attributesSection.appendChild(node);
+            });
+        }
         
         rootNode.appendChild(attributesSection);
     }
@@ -366,45 +513,13 @@ function createTree(data, container, parentPath = '') {
     container.appendChild(rootNode);
 }
 
-function updateStatus(connected) {
-    statusIndicator.classList.toggle('connected', connected);
-    statusText.textContent = connected ? 'Connected' : 'Disconnected';
-    input.disabled = !connected;
-    inspectInput.disabled = !connected;
-    input.placeholder = connected 
-        ? "Enter Python code here. Press Shift+Enter to execute, or leave an empty line to execute a block."
-        : "Waiting for Python connection...";
-}
-
-input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        if (e.shiftKey) {
-            e.preventDefault();
-            const code = input.value.trim();
-            if (code) {
-                socket.emit('execute', {
-                    type: 'repl',
-                    code: code
-                });
-                input.value = '';
-                codeBuffer = [];
-            }
-        } else if (input.value.trim() === '') {
-            e.preventDefault();
-            if (codeBuffer.length > 0) {
-                const code = codeBuffer.join('\n');
-                socket.emit('execute', {
-                    type: 'repl',
-                    code: code
-                });
-                input.value = '';
-                codeBuffer = [];
-            }
-        }
-    }
-});
-
 input.addEventListener('input', () => {
     const lines = input.value.split('\n');
     codeBuffer = lines.filter(line => line.trim() !== '');
+});
+
+// Add modules shortcut handler
+document.getElementById('modules-shortcut').addEventListener('click', () => {
+    inspectInput.value = 'sys.modules';
+    inspectExpression();
 });
